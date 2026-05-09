@@ -1,5 +1,5 @@
 """
-Raspberry Pi Pico - HID Keyboard + UART Bridge v2
+Raspberry Pi Pico - HID Keyboard + UART Bridge
 Receives JSON commands from ESP8266 via UART → executes as HID keyboard
 
 WIRING:
