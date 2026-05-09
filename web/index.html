@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>PicoKey — Remote Keyboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0c10;--surface:#111318;--surface2:#181c23;--surface3:#1e232c;
+  --border:#2a3040;--border2:#3a4458;
+  --accent:#00d4ff;--accent2:#7c3aed;--accent3:#f59e0b;
+  --green:#10b981;--red:#ef4444;--orange:#f97316;
+  --text:#e2e8f0;--text2:#94a3b8;--text3:#475569;
+  --radius:8px;--radius2:12px;
+  --font:'JetBrains Mono',monospace;--font2:'Syne',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;overflow-x:hidden}
+body{display:flex;flex-direction:column;min-height:100vh}
+
+/* ── LOGIN ── */
+#login-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:24px}
+.login-box{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius2);padding:40px;width:min(360px,90vw);display:flex;flex-direction:column;gap:16px}
+.login-logo{font-family:var(--font2);font-size:28px;font-weight:800;color:var(--accent);letter-spacing:-1px;text-align:center}
+.login-logo span{color:var(--text2)}
+.login-input{background:var(--bg);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:14px;padding:12px 14px;width:100%;outline:none;transition:border-color .2s}
+.login-input:focus{border-color:var(--accent)}
+.login-btn{background:var(--accent);color:#000;font-family:var(--font2);font-weight:700;font-size:14px;padding:12px;border:none;border-radius:var(--radius);cursor:pointer;letter-spacing:1px;transition:opacity .2s}
+.login-btn:hover{opacity:.85}
+.login-err{color:var(--red);font-size:12px;text-align:center;min-height:16px}
+
+/* ── TOP BAR ── */
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100}
+.logo{font-family:var(--font2);font-weight:800;font-size:18px;color:var(--accent);letter-spacing:-0.5px}
+.logo span{color:var(--text3)}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--text3);flex-shrink:0;transition:background .5s}
+.status-dot.online{background:var(--green);box-shadow:0 0 6px var(--green)}
+.status-dot.offline{background:var(--red)}
+#status-label{font-size:11px;color:var(--text2);margin-right:auto}
+.hdr-btn{background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text2);font-family:var(--font);font-size:11px;padding:6px 10px;cursor:pointer;transition:all .2s}
+.hdr-btn:hover{border-color:var(--border2);color:var(--text)}
+#queue-badge{background:var(--accent2);color:#fff;border-radius:4px;font-size:10px;padding:1px 5px;margin-left:4px}
+
+/* ── MAIN LAYOUT ── */
+main{flex:1;display:flex;flex-direction:column;gap:0;max-width:900px;margin:0 auto;width:100%;padding:0}
+.section{padding:16px;border-bottom:1px solid var(--border)}
+
+/* ── TEXT INPUT ── */
+.text-row{display:flex;gap:8px;align-items:flex-end}
+#text-input{flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:15px;padding:12px 14px;resize:none;outline:none;min-height:48px;max-height:200px;transition:border-color .2s;line-height:1.5}
+#text-input:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,212,255,.1)}
+.send-btn{background:var(--accent);color:#000;border:none;border-radius:var(--radius);font-family:var(--font2);font-weight:700;font-size:13px;padding:12px 18px;cursor:pointer;white-space:nowrap;transition:all .2s;height:48px}
+.send-btn:hover{opacity:.85;transform:translateY(-1px)}
+.send-btn:active{transform:translateY(0);opacity:1}
+.input-opts{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.iopt{background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text2);font-family:var(--font);font-size:11px;padding:5px 10px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:4px}
+.iopt:hover,.iopt.active{background:var(--surface2);border-color:var(--border2);color:var(--text)}
+.iopt.active{border-color:var(--accent);color:var(--accent)}
+
+/* ── KEY SECTIONS ── */
+.sec-title{font-family:var(--font2);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:2px;margin-bottom:10px}
+
+/* ── KEY BUTTON BASE ── */
+.krow{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px}
+.k{background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:var(--font);font-size:12px;padding:7px 10px;cursor:pointer;user-select:none;transition:all .15s;min-width:36px;text-align:center;position:relative;line-height:1.2;display:flex;align-items:center;justify-content:center;gap:3px}
+.k:hover{background:var(--surface3);border-color:var(--text3);transform:translateY(-1px)}
+.k:active,.k.pressed{background:var(--accent);color:#000;border-color:var(--accent);transform:scale(.95)}
+.k.mod{background:var(--surface3);border-color:var(--border2);color:var(--accent3)}
+.k.mod.held{background:var(--accent3);color:#000;border-color:var(--accent3)}
+.k.wide{min-width:64px;padding:7px 14px}
+.k.wider{min-width:90px}
+.k.widest{min-width:140px}
+.k.danger{color:var(--red)}
+.k.nav{color:var(--accent)}
+.k.fn{color:var(--text3);font-size:10px}
+.k.special{color:var(--accent2)}
+.k svg{width:13px;height:13px;fill:currentColor;flex-shrink:0}
+
+/* ── MODIFIERS HELD DISPLAY ── */
+#active-mods{display:flex;gap:6px;min-height:26px;flex-wrap:wrap}
+.mod-chip{background:var(--accent3);color:#000;border-radius:4px;font-size:10px;font-weight:700;padding:3px 8px;font-family:var(--font2)}
+
+/* ── COMBOS ── */
+.combos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+.combo-btn{background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:11px;padding:10px 12px;cursor:pointer;transition:all .2s;text-align:center;position:relative}
+.combo-btn:hover{border-color:var(--accent2);color:var(--accent2);transform:translateY(-1px)}
+.combo-btn .cb-name{font-family:var(--font2);font-weight:700;font-size:13px;display:block;margin-bottom:3px}
+.combo-btn .cb-keys{color:var(--text3);font-size:10px}
+.combo-btn .cb-del{position:absolute;top:4px;right:6px;color:var(--red);opacity:0;font-size:14px;line-height:1;background:none;border:none;cursor:pointer;padding:0}
+.combo-btn:hover .cb-del{opacity:1}
+.add-combo-btn{background:transparent;border:1px dashed var(--border2);border-radius:var(--radius);color:var(--text3);font-family:var(--font);font-size:12px;padding:10px;cursor:pointer;transition:all .2s;text-align:center}
+.add-combo-btn:hover{border-color:var(--accent2);color:var(--accent2)}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal-overlay.show{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius2);padding:28px;width:min(420px,92vw);display:flex;flex-direction:column;gap:14px}
+.modal h3{font-family:var(--font2);font-size:16px;font-weight:700}
+.modal label{font-size:11px;color:var(--text2);margin-bottom:4px;display:block}
+.modal input{background:var(--bg);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:13px;padding:10px 12px;width:100%;outline:none}
+.modal input:focus{border-color:var(--accent)}
+.modal-hint{font-size:11px;color:var(--text3)}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end}
+.btn-ghost{background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--text2);font-family:var(--font);font-size:12px;padding:8px 16px;cursor:pointer}
+.btn-primary{background:var(--accent2);border:none;border-radius:6px;color:#fff;font-family:var(--font2);font-weight:700;font-size:12px;padding:8px 16px;cursor:pointer}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:20px;right:20px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);padding:10px 16px;font-size:12px;z-index:999;opacity:0;transform:translateY(8px);transition:all .3s;pointer-events:none;max-width:260px}
+#toast.show{opacity:1;transform:translateY(0)}
+#toast.ok{border-color:var(--green);color:var(--green)}
+#toast.err{border-color:var(--red);color:var(--red)}
+
+/* ── RESPONSIVE ── */
+@media(max-width:600px){
+  .section{padding:12px}
+  .k{font-size:11px;padding:6px 7px;min-width:30px}
+  .k.wide{min-width:52px}
+  .k.wider{min-width:72px}
+  .k.widest{min-width:110px}
+  .combos-grid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr))}
+}
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">Pico<span>Key</span></div>
+    <input class="login-input" type="password" id="pw-input" placeholder="Dashboard password" autocomplete="current-password">
+    <button class="login-btn" onclick="doLogin()">CONNECT</button>
+    <div class="login-err" id="login-err"></div>
+  </div>
+</div>
+
+<!-- ── HEADER ── -->
+<header>
+  <div class="logo">Pico<span>Key</span></div>
+  <div class="status-dot" id="status-dot"></div>
+  <span id="status-label">connecting…</span>
+  <button class="hdr-btn" onclick="clearQueue()">Clear Queue<span id="queue-badge">0</span></button>
+  <button class="hdr-btn" onclick="logout()">Logout</button>
+</header>
+
+<main>
+
+  <!-- ── TEXT INPUT ── -->
+  <div class="section">
+    <div class="sec-title">Text Input</div>
+    <div class="text-row">
+      <textarea id="text-input" rows="1" placeholder="Type here → sends to focused computer…" oninput="autoResize(this)" onkeydown="handleTextKey(event)"></textarea>
+      <button class="send-btn" onclick="sendText()">SEND</button>
+    </div>
+    <div class="input-opts">
+      <button class="iopt" id="opt-enter" onclick="toggleOpt('enter')" title="Append Enter after text">↵ Enter after</button>
+      <button class="iopt" id="opt-clear" onclick="toggleOpt('clear')" title="Clear field after send">⌫ Auto-clear</button>
+      <button class="iopt" onclick="sendKey('ENTER')">Send ↵</button>
+      <button class="iopt" onclick="sendKey('TAB')">Send Tab</button>
+      <button class="iopt" onclick="sendKey('ESC')">Send Esc</button>
+      <button class="iopt" onclick="sendKey('BKSP')">Send ⌫</button>
+    </div>
+  </div>
+
+  <!-- ── MODIFIER KEYS ── -->
+  <div class="section">
+    <div class="sec-title">Modifiers <span style="color:var(--text3);font-size:10px;font-weight:400;text-transform:none">— tap to hold, tap again to release</span></div>
+    <div id="active-mods" style="margin-bottom:10px"></div>
+    <div class="krow">
+      <button class="k mod wide" id="mod-CTRL"  onclick="toggleMod('CTRL')">Ctrl</button>
+      <button class="k mod wide" id="mod-SHIFT" onclick="toggleMod('SHIFT')">Shift</button>
+      <button class="k mod wide" id="mod-ALT"   onclick="toggleMod('ALT')">Alt</button>
+      <button class="k mod wide" id="mod-WIN"   onclick="toggleMod('WIN')">⊞ Win</button>
+      <button class="k mod wide" id="mod-RALT"  onclick="toggleMod('RALT')">AltGr</button>
+    </div>
+    <div class="krow" style="margin-top:6px">
+      <button class="k wide" onclick="releaseAll()">Release All</button>
+      <button class="k wide" onclick="sendCombo()">Send + Held</button>
+    </div>
+  </div>
+
+  <!-- ── FUNCTION KEYS ── -->
+  <div class="section">
+    <div class="sec-title">Function Keys</div>
+    <div class="krow">
+      <button class="k fn" onclick="sendKey('F1')">F1</button>
+      <button class="k fn" onclick="sendKey('F2')">F2</button>
+      <button class="k fn" onclick="sendKey('F3')">F3</button>
+      <button class="k fn" onclick="sendKey('F4')">F4</button>
+      <button class="k fn" onclick="sendKey('F5')">F5</button>
+      <button class="k fn" onclick="sendKey('F6')">F6</button>
+      <button class="k fn" onclick="sendKey('F7')">F7</button>
+      <button class="k fn" onclick="sendKey('F8')">F8</button>
+      <button class="k fn" onclick="sendKey('F9')">F9</button>
+      <button class="k fn" onclick="sendKey('F10')">F10</button>
+      <button class="k fn" onclick="sendKey('F11')">F11</button>
+      <button class="k fn" onclick="sendKey('F12')">F12</button>
+    </div>
+  </div>
+
+  <!-- ── NAVIGATION ── -->
+  <div class="section">
+    <div class="sec-title">Navigation &amp; Special</div>
+    <div class="krow">
+      <button class="k nav" onclick="sendKey('HOME')">Home</button>
+      <button class="k nav" onclick="sendKey('END')">End</button>
+      <button class="k nav" onclick="sendKey('PGUP')">PgUp</button>
+      <button class="k nav" onclick="sendKey('PGDN')">PgDn</button>
+      <button class="k nav" onclick="sendKey('INS')">Ins</button>
+      <button class="k danger" onclick="sendKey('DEL')">Del</button>
+      <button class="k special" onclick="sendKey('PRTSCR')">PrtSc</button>
+      <button class="k special" onclick="sendKey('SCRLOCK')">ScrlLk</button>
+      <button class="k special" onclick="sendKey('PAUSE')">Pause</button>
+      <button class="k special" onclick="sendKey('CAPS')">CpsLk</button>
+      <button class="k special" onclick="sendKey('NUMLOCK')">NumLk</button>
+    </div>
+    <div class="krow" style="margin-top:8px">
+      <!-- Arrow cluster -->
+      <div style="display:inline-grid;grid-template-columns:repeat(3,36px);grid-template-rows:repeat(2,32px);gap:4px">
+        <div></div>
+        <button class="k nav" style="min-width:36px;padding:4px" onclick="sendKey('UP')">▲</button>
+        <div></div>
+        <button class="k nav" style="min-width:36px;padding:4px" onclick="sendKey('LEFT')">◀</button>
+        <button class="k nav" style="min-width:36px;padding:4px" onclick="sendKey('DOWN')">▼</button>
+        <button class="k nav" style="min-width:36px;padding:4px" onclick="sendKey('RIGHT')">▶</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── COMMON COMBOS ── -->
+  <div class="section">
+    <div class="sec-title">Common Shortcuts</div>
+    <div class="krow">
+      <button class="k wide" onclick="sendComboKeys(['CTRL','C'])">Ctrl+C</button>
+      <button class="k wide" onclick="sendComboKeys(['CTRL','V'])">Ctrl+V</button>
+      <button class="k wide" onclick="sendComboKeys(['CTRL','X'])">Ctrl+X</button>
+      <button class="k wide" onclick="sendComboKeys(['CTRL','Z'])">Ctrl+Z</button>
+      <button class="k wide" onclick="sendComboKeys(['CTRL','Y'])">Ctrl+Y</button>
+      <button class="k wide" onclick="sendComboKeys(['CTRL','A'])">Ctrl+A</button>
+      <button class="k wide" onclick="sendComboKeys(['CTRL','S'])">Ctrl+S</button>
+      <button class="k wide" onclick="sendComboKeys(['CTRL','W'])">Ctrl+W</button>
+      <button class="k wide" onclick="sendComboKeys(['CTRL','T'])">Ctrl+T</button>
+      <button class="k wide" onclick="sendComboKeys(['ALT','F4'])">Alt+F4</button>
+      <button class="k wide" onclick="sendComboKeys(['ALT','TAB'])">Alt+Tab</button>
+      <button class="k wide" onclick="sendComboKeys(['WIN','R'])">Win+R</button>
+      <button class="k wide" onclick="sendComboKeys(['WIN','D'])">Win+D</button>
+      <button class="k wide" onclick="sendComboKeys(['WIN','E'])">Win+E</button>
+      <button class="k wide" onclick="sendComboKeys(['WIN','L'])">Win+L</button>
+      <button class="k wide" onclick="sendComboKeys(['CTRL','SHIFT','ESC'])">Task Mgr</button>
+      <button class="k wide" onclick="sendComboKeys(['CTRL','ALT','DEL'])">Ctrl+Alt+Del</button>
+      <button class="k wide" onclick="sendComboKeys(['WIN','PRTSCR'])">Win+PrtSc</button>
+    </div>
+  </div>
+
+  <!-- ── CUSTOM COMBOS ── -->
+  <div class="section">
+    <div class="sec-title">Custom Macros</div>
+    <div class="combos-grid" id="combos-grid"></div>
+  </div>
+
+</main>
+
+<!-- ── ADD COMBO MODAL ── -->
+<div class="modal-overlay" id="combo-modal">
+  <div class="modal">
+    <h3>Add Custom Macro</h3>
+    <div>
+      <label>Label</label>
+      <input id="cm-name" placeholder="e.g. Open Terminal" maxlength="30">
+    </div>
+    <div>
+      <label>Keys (comma separated)</label>
+      <input id="cm-keys" placeholder="e.g. WIN,R  or  CTRL,SHIFT,T">
+      <div class="modal-hint" style="margin-top:6px">Keys: CTRL SHIFT ALT WIN A-Z F1-F12 ENTER ESC TAB BKSP DEL HOME END UP DOWN LEFT RIGHT PGUP PGDN</div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-ghost" onclick="closeComboModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveCombo()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const API = 'api.php';
+let session = localStorage.getItem('pk_session') || '';
+let heldMods = new Set();
+let combos = [];
+let opts = { enter: false, clear: true };
+let statusTimer, queueCount = 0;
+
+// ── AUTH ────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const pw = document.getElementById('pw-input').value;
+  const r = await api({ action:'login', password:pw }, false);
+  if (r.status === 'ok') {
+    session = r.session;
+    localStorage.setItem('pk_session', session);
+    document.getElementById('login-screen').style.display = 'none';
+    init();
+  } else {
+    document.getElementById('login-err').textContent = 'Invalid password';
+  }
+}
+function logout() {
+  localStorage.removeItem('pk_session');
+  location.reload();
+}
+document.getElementById('pw-input').addEventListener('keydown', e => e.key==='Enter' && doLogin());
+
+// ── INIT ────────────────────────────────────────────────────────────────────
+async function init() {
+  if (!session) return;
+  document.getElementById('login-screen').style.display = 'none';
+  await loadCombos();
+  pollStatus();
+  statusTimer = setInterval(pollStatus, 5000);
+}
+
+// ── STATUS ──────────────────────────────────────────────────────────────────
+async function pollStatus() {
+  const r = await api({ action:'status' });
+  if (!r) return;
+  const dot = document.getElementById('status-dot');
+  const lbl = document.getElementById('status-label');
+  if (r.device?.online) {
+    dot.className = 'status-dot online';
+    lbl.textContent = 'Online · ' + (r.device.ip||'');
+  } else {
+    dot.className = 'status-dot offline';
+    lbl.textContent = 'Device offline';
+  }
+}
+
+// ── SEND ────────────────────────────────────────────────────────────────────
+async function sendText() {
+  const el = document.getElementById('text-input');
+  const text = el.value;
+  if (!text) return;
+  const cmds = [{ t:'text', v:text }];
+  if (opts.enter) cmds.push({ t:'tap', v:'ENTER' });
+  for (const cmd of cmds) {
+    const r = await api({ action:'send', cmd });
+    if (r?.status !== 'ok') { toast('Send failed', 'err'); return; }
+    queueCount = r.queued || 0;
+    updateQBadge();
+  }
+  if (opts.clear) { el.value = ''; autoResize(el); }
+  toast('Sent ✓', 'ok');
+}
+
+async function sendKey(key) {
+  const keys = [...heldMods, key];
+  const cmd = keys.length > 1 ? { t:'combo', v:keys } : { t:'tap', v:key };
+  const r = await api({ action:'send', cmd });
+  if (r?.status === 'ok') {
+    flashKey(key);
+    updateQBadge(r.queued);
+    // Auto-release held mods after every key send — prevents stale mod state
+    if (heldMods.size > 0) releaseAll();
+  } else toast('Failed', 'err');
+}
+
+async function sendComboKeys(keys) {
+  const r = await api({ action:'send', cmd:{ t:'combo', v:keys } });
+  if (r?.status === 'ok') { toast(keys.join('+') + ' ✓', 'ok'); updateQBadge(r.queued); }
+  else toast('Failed', 'err');
+}
+
+async function sendCombo() {
+  const keys = [...heldMods];
+  if (!keys.length) { toast('No modifiers held', 'err'); return; }
+  const inputVal = document.getElementById('text-input').value.trim().toUpperCase();
+  // Support: held mods alone (single WIN tap) OR mods+letters
+  const all = inputVal ? [...keys, ...inputVal.split('')] : keys;
+  const cmd = all.length === 1 ? { t:'tap', v:all[0] } : { t:'combo', v:all };
+  const r = await api({ action:'send', cmd });
+  if (r?.status === 'ok') {
+    toast('Sent: ' + all.join('+') + ' ✓', 'ok');
+    updateQBadge(r.queued);
+    releaseAll();
+  }
+}
+
+// ── MODIFIERS ───────────────────────────────────────────────────────────────
+function toggleMod(m) {
+  const btn = document.getElementById('mod-'+m);
+  if (heldMods.has(m)) { heldMods.delete(m); btn.classList.remove('held'); }
+  else { heldMods.add(m); btn.classList.add('held'); }
+  renderActiveMods();
+}
+function releaseAll() {
+  heldMods.clear();
+  document.querySelectorAll('.k.mod').forEach(b => b.classList.remove('held'));
+  renderActiveMods();
+}
+function renderActiveMods() {
+  const el = document.getElementById('active-mods');
+  el.innerHTML = [...heldMods].map(m=>`<span class="mod-chip">${m}</span>`).join('');
+}
+
+// ── CUSTOM COMBOS ────────────────────────────────────────────────────────────
+async function loadCombos() {
+  const r = await api({ action:'get_combos' });
+  if (r?.status === 'ok') { combos = r.combos || []; renderCombos(); }
+}
+function renderCombos() {
+  const grid = document.getElementById('combos-grid');
+  grid.innerHTML = combos.map((c,i) => `
+    <button class="combo-btn" onclick="runCombo(${i})">
+      <button class="cb-del" onclick="event.stopPropagation();deleteCombo(${i})">×</button>
+      <span class="cb-name">${esc(c.name)}</span>
+      <span class="cb-keys">${esc(c.keys.join('+'))}</span>
+    </button>`).join('') +
+    `<button class="add-combo-btn" onclick="openComboModal()">+ Add Macro</button>`;
+}
+async function runCombo(i) {
+  const c = combos[i];
+  const r = await api({ action:'send', cmd:{ t:'combo', v:c.keys } });
+  if (r?.status === 'ok') toast(c.name + ' ✓', 'ok');
+  else toast('Failed', 'err');
+}
+function openComboModal() {
+  document.getElementById('combo-modal').classList.add('show');
+  document.getElementById('cm-name').focus();
+}
+function closeComboModal() {
+  document.getElementById('combo-modal').classList.remove('show');
+  document.getElementById('cm-name').value = '';
+  document.getElementById('cm-keys').value = '';
+}
+async function saveCombo() {
+  const name = document.getElementById('cm-name').value.trim();
+  const keysRaw = document.getElementById('cm-keys').value.trim();
+  if (!name || !keysRaw) return;
+  const keys = keysRaw.split(',').map(k => k.trim().toUpperCase()).filter(Boolean);
+  combos.push({ name, keys });
+  const r = await api({ action:'save_combos', combos });
+  if (r?.status === 'ok') { renderCombos(); closeComboModal(); toast('Macro saved ✓', 'ok'); }
+}
+async function deleteCombo(i) {
+  combos.splice(i, 1);
+  await api({ action:'save_combos', combos });
+  renderCombos();
+}
+
+// ── QUEUE ────────────────────────────────────────────────────────────────────
+async function clearQueue() {
+  const r = await api({ action:'clear_queue' });
+  if (r?.status === 'ok') { updateQBadge(0); toast('Queue cleared', 'ok'); }
+}
+function updateQBadge(n) {
+  if (n !== undefined) queueCount = n;
+  document.getElementById('queue-badge').textContent = queueCount;
+}
+
+// ── OPTS ─────────────────────────────────────────────────────────────────────
+function toggleOpt(k) {
+  opts[k] = !opts[k];
+  document.getElementById('opt-'+k).classList.toggle('active', opts[k]);
+}
+
+// ── UTILS ────────────────────────────────────────────────────────────────────
+async function api(body, auth=true) {
+  try {
+    const headers = { 'Content-Type':'application/json' };
+    if (auth) headers['X-Auth-Token'] = session;
+    const r = await fetch(API, { method:'POST', headers, body:JSON.stringify(body) });
+    if (r.status === 401) { showLogin(); return null; }
+    return await r.json();
+  } catch(e) { return null; }
+}
+function showLogin() {
+  session = '';
+  localStorage.removeItem('pk_session');
+  document.getElementById('login-screen').style.display = 'flex';
+}
+function toast(msg, type='ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show ' + type;
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.className = '', 2500);
+}
+function flashKey(key) {
+  const btn = document.querySelector(`[onclick="sendKey('${key}')"]`);
+  if (!btn) return;
+  btn.classList.add('pressed');
+  setTimeout(() => btn.classList.remove('pressed'), 200);
+}
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+}
+function handleTextKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendText(); }
+}
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── BOOT ─────────────────────────────────────────────────────────────────────
+if (session) init();
+else document.getElementById('login-screen').style.display = 'flex';
+</script>
+</body>
+</html>
